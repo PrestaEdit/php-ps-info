@@ -11,16 +11,24 @@ class PhpPsInfo
     const TYPE_OK = true;
     const TYPE_ERROR = false;
     const TYPE_WARNING = null;
-    
+
     const TYPE_SUCCESS_CLASS = 'table-success';
     const TYPE_ERROR_CLASS = 'table-danger';
     const TYPE_INFO_CLASS = 'table-info';
     const TYPE_WARNING_CLASS = 'table-warning';
 
     protected $requirements = [
-        'versions' => [
-            'php' => '7.1',
-            'mysql' => '5.5',
+        '8' => [
+            'versions' => [
+                'php' => '7.1',
+                'mysql' => '5.5',
+            ],
+        ],
+        '9' => [
+            'versions' => [
+                'php' => '8.1',
+                'mysql' => '5.7',
+            ],
         ],
         'extensions' => [
             'bcmath' => false,
@@ -74,9 +82,17 @@ class PhpPsInfo
     ];
 
     protected $recommended = [
-        'versions' => [
-            'php' => '8.1',
-            'mysql' => '8.0',
+        '8' => [
+            'versions' => [
+                'php' => '8.1',
+                'mysql' => '8.0',
+            ],
+        ],
+        '9' => [
+            'versions' => [
+                'php' => '8.4',
+                'mysql' => '8.0',
+            ],
         ],
         'extensions' => [
             'bcmath' => true,
@@ -179,34 +195,61 @@ class PhpPsInfo
             ];
 
         $data['PHP Version'] = [
-            $this->requirements['versions']['php'],
-            $this->recommended['versions']['php'],
-            PHP_VERSION,
-            version_compare(PHP_VERSION, $this->recommended['versions']['php'], '>=') ?
+            // PrestaShop 8
+            $this->requirements['8']['versions']['php'],
+            $this->recommended['8']['versions']['php'],
+            version_compare(PHP_VERSION, $this->recommended['8']['versions']['php'], '>=') ?
             self::TYPE_OK : (
-                version_compare(PHP_VERSION, $this->requirements['versions']['php'], '>=') ?
+                version_compare(PHP_VERSION, $this->requirements['8']['versions']['php'], '>=') ?
                 self::TYPE_WARNING :
                 self::TYPE_ERROR
-            )
+            ),
+            PHP_VERSION,
+            // PrestaShop 9
+            $this->requirements['9']['versions']['php'],
+            $this->recommended['9']['versions']['php'],
+            version_compare(PHP_VERSION, $this->recommended['9']['versions']['php'], '>=') ?
+            self::TYPE_OK : (
+                version_compare(PHP_VERSION, $this->requirements['9']['versions']['php'], '>=') ?
+                self::TYPE_WARNING :
+                self::TYPE_ERROR
+            ),
+            PHP_VERSION
         ];
 
         if (!extension_loaded('mysqli') || !is_callable('mysqli_connect')) {
             $data['MySQLi Extension'] = [
+                // PrestaShop 8
                 true,
                 true,
                 'Not installed',
+                // PrestaShop 9
+                true,
+                true,
+                'Not installed',
+                // Global
                 self::TYPE_ERROR,
             ];
         } else {
             $data['MySQLi Extension'] = [
-                $this->requirements['versions']['mysql'],
-                $this->recommended['versions']['mysql'],
+                // PrestaShop 8
+                $this->requirements['8']['versions']['mysql'],
+                $this->recommended['8']['versions']['mysql'],
+                self::TYPE_ERROR,
                 mysqli_get_client_info(),
+                // PrestaShop 9
+                $this->requirements['9']['versions']['mysql'],
+                $this->recommended['9']['versions']['mysql'],
                 self::TYPE_OK,
+                mysqli_get_client_info(),
             ];
         }
 
         $data['Internet connectivity (Prestashop)'] = [
+            false,
+            true,
+            gethostbyname('www.prestashop.com') !== 'www.prestashop.com',
+            gethostbyname('www.prestashop.com') !== 'www.prestashop.com',
             false,
             true,
             gethostbyname('www.prestashop.com') !== 'www.prestashop.com',
@@ -421,17 +464,16 @@ class PhpPsInfo
      * @param array $data
      * @return string
      */
-    public function toHtmlClass(array $data)
+    public function toHtmlClass(array $data, int $index = 2)
     {
         if (count($data) === 1 && !is_bool($data[0])) {
             return self::TYPE_INFO_CLASS;
         }
 
-
         if (count($data) === 1 && is_bool($data[0])) {
             $result = $data[0];
-        } elseif (array_key_exists(3, $data)) {
-            $result = $data[3];
+        } elseif (count($data) === 8 && array_key_exists($index, $data)) {
+            $result = $data[$index];
         } else {
             if ($data[2] >= $data[1]) {
                 $result = self::TYPE_OK;
@@ -544,7 +586,15 @@ $info->checkAuth();
                         <table class="table table-striped table-sm text-center">
                             <thead>
                                 <tr>
+                                    <th class="text-left">&nbsp;</th>
+                                    <th colspan="3">PrestaShop 8</th>
+                                    <th colspan="3">PrestaShop 9</th>
+                                </tr>
+                                <tr>
                                     <th class="text-left">#</th>
+                                    <th>Required</th>
+                                    <th>Recommended</th>
+                                    <th class="border-right">Current</th>
                                     <th>Required</th>
                                     <th>Recommended</th>
                                     <th>Current</th>
@@ -555,14 +605,17 @@ $info->checkAuth();
                                     <?php if (count($data) === 1) : ?>
                                         <tr>
                                             <td class="text-left"><?php echo $label ?></td>
-                                            <td class="<?php echo $info->toHtmlClass($data); ?>" colspan="3"><?php echo $info->toString($data[0]) ?></td>
+                                            <td class="<?php echo $info->toHtmlClass($data); ?>" colspan="6"><?php echo $info->toString($data[0]) ?></td>
                                         </tr>
                                     <?php else : ?>
                                         <tr>
                                             <td class="text-left"><?php echo $label ?></td>
                                             <td><?php echo $info->toString($data[0]) ?></td>
                                             <td><?php echo $info->toString($data[1]) ?></td>
-                                            <td class="<?php echo $info->toHtmlClass($data); ?>"><?php echo $info->toString($data[2]) ?></td>
+                                            <td class="<?php echo $info->toHtmlClass($data, 2); ?> border-right"><?php echo $info->toString($data[3]) ?></td>
+                                            <td><?php echo $info->toString($data[4]) ?></td>
+                                            <td><?php echo $info->toString($data[5]) ?></td>
+                                            <td class="<?php echo $info->toHtmlClass($data, 6); ?>"><?php echo $info->toString($data[7]) ?></td>
                                         </tr>
                                     <?php endif; ?>
                                 <?php endforeach; ?>
@@ -676,7 +729,7 @@ $info->checkAuth();
         </div>
 
         <footer class="footer-copyright text-center py-3">
-            © <?php echo date('Y') ?> Copyright: <a href="https://prestashop.com/">PrestaShop</a>
+            © <?php echo date('Y') ?> Copyright: <a href="https://prestashop-project.org/">PrestaShop</a>
         </footer>
     </body>
 </html>
